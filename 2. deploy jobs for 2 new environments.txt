@@ -1,0 +1,69 @@
+# deploy job for preprod environment
+deploy to preprod:
+  stage: deploy
+  variables:
+    TARGET_ENV: preprod
+  script:
+    - echo "Do your deploy here to ${TARGET_ENV}"
+    - echo LOGIN = ${MyLogin}; PASS = ${MyPassword}
+  only:
+    - main
+  environment:
+    name: preprod
+    on_stop: stop to preprod
+    auto_stop_in: 1 day
+
+stop to preprod:
+  stage: stop
+  variables:
+    TARGET_ENV: preprod
+  script:
+    - echo "STOP ${TARGET_ENV}"
+  only:
+    - main
+  when: manual
+  environment:
+    name: preprod
+    action: stop
+
+# deploy job for production environment
+deploy to production:
+  stage: deploy
+  variables:
+    TARGET_ENV: production
+  script:
+    - echo "Do your deploy here to ${TARGET_ENV}"
+    - echo LOGIN = ${MyLogin}; PASS = ${MyPassword}
+  only:
+    - main
+  environment:
+    name: production
+    on_stop: stop to production
+    auto_stop_in: 1 day
+
+stop to production:
+  stage: stop
+  variables:
+    TARGET_ENV: production
+  script:
+    - echo "STOP ${TARGET_ENV}"
+  only:
+    - main
+  when: manual
+  environment:
+    name: production
+    action: stop
+
+deploy to stage:
+  stage: deploy
+  variables:
+    TARGET_ENV: staging
+  script:
+    - echo "Do your deploy here to ${TARGET_ENV}"
+    - echo ${DB_SERVER}
+  only:
+    - main
+  environment:
+    name: staging
+    on_stop: stop to staging
+    auto_stop_in: 1 day

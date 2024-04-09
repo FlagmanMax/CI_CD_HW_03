@@ -1,0 +1,202 @@
+
+image: busybox:latest
+
+stages:
+  - build
+  - test
+  - deploy
+  - stop
+
+cache:
+  key:
+    files:
+      - composer.lock
+  paths:
+    - vendor/  
+
+variables:
+  IMAGE_TAG : $CI_COMMIT_BRANCH-$CI_COMMIT_SHORT_SHA
+
+build1:
+  stage: build
+  script:
+    - echo "Do your build here"
+    - echo one >> file1.txt
+    - mkdir -p vendor/
+    - echo "build" > vendor/hello.txt
+    # - echo two >> file2.txt
+  artifacts:
+    paths:
+    - file1.txt
+  #     - file2.txt
+  #   expire_in: 30 days
+
+docker build:
+  image: docker:latest
+  stage: build
+  services:
+    - docker:dind
+  script:
+    - docker login -u $GITLAB_CI_USER -p $GITLAB_CI_PASSWORD $CI_REGISTRY
+    - echo $GITLAB_CI_USER  $GITLAB_CI_PASSWORD $CI_REGISTRY $CI_REGISTRY_IMAGE:$IMAGE_TAG
+    - docker build -t $CI_REGISTRY_IMAGE:$IMAGE_TAG .
+    - docker push $CI_REGISTRY_IMAGE:$IMAGE_TAG
+
+test1:
+  image: docker:latest
+  stage: test
+  services:
+    - docker:dind
+  script:
+    - echo "Do a test here"
+    - echo "For example run a test suite"
+    # - grep one file1.txt
+    # - sleep 60
+    # - cat vendor/hello.txt
+
+    # Login to Registry
+    - echo "docker login -u $GITLAB_CI_USER -p $GITLAB_CI_PASSWORD $CI_REGISTRY"
+    - docker login -u $GITLAB_CI_USER -p $GITLAB_CI_PASSWORD $CI_REGISTRY
+
+    # Pull the built image
+    - echo "docker pull $CI_REGISTRY_IMAGE:$IMAGE_TAG"
+    - docker pull $CI_REGISTRY_IMAGE:$IMAGE_TAG
+
+    # Run docker
+    - echo "docker run -d --name my-container $CI_REGISTRY_IMAGE:$IMAGE_TAG"
+    - docker run -d --name my-container $CI_REGISTRY_IMAGE:$IMAGE_TAG
+    # - docker run $CI_REGISTRY_IMAGE:$IMAGE_TAG
+    # - docker ps
+
+    # Check docker is running
+    - echo "docker ps | grep my-container"
+    - docker ps | grep my-container
+  artifacts:
+    paths:
+     - ./
+    exclude:
+      - file1.txt
+
+test2:
+  stage: test
+  script:
+    - echo "Do another parallel test here"
+    - echo "For example run a lint test"
+    # - grep two file2.txt
+  artifacts:
+    paths:
+      - ./
+    exclude:
+      - file2.txt
+
+# deploy job for preprod environment
+deploy to preprod:
+  stage: deploy
+  variables:
+    TARGET_ENV: preprod
+    MyLogin: MYLOGIN_PREPROD
+  script:
+    - echo "Do your deploy here to ${TARGET_ENV}"
+    - echo "LOGIN = ${MyLogin}; PASS = $MyPassword"
+  only:
+    - main
+  environment:
+    name: preprod
+    on_stop: stop to preprod
+    auto_stop_in: 1 day
+
+stop to preprod:
+  stage: stop
+  variables:
+    TARGET_ENV: preprod
+  script:
+    - echo "STOP ${TARGET_ENV}"
+  only:
+    - main
+  when: manual
+  environment:
+    name: preprod
+    action: stop
+
+# deploy job for production environment
+deploy to production:
+  stage: deploy
+  variables:
+    TARGET_ENV: production
+    MyLogin: MYLOGIN_PRODUCTION
+  script:
+    - echo "Do your deploy here to ${TARGET_ENV}"
+    - echo "LOGIN = ${MyLogin}; PASS = $MyPassword"
+  only:
+    - main
+  environment:
+    name: production
+    on_stop: stop to production
+    auto_stop_in: 1 day
+
+stop to production:
+  stage: stop
+  variables:
+    TARGET_ENV: production
+  script:
+    - echo "STOP ${TARGET_ENV}"
+  only:
+    - main
+  when: manual
+  environment:
+    name: production
+    action: stop
+
+deploy to stage:
+  stage: deploy
+  variables:
+    TARGET_ENV: staging
+  script:
+    - echo "Do your deploy here to ${TARGET_ENV}"
+    - echo ${DB_SERVER}
+  only:
+    - main
+  environment:
+    name: staging
+    on_stop: stop to staging
+    auto_stop_in: 1 day
+
+stop to staging:
+  stage: stop
+  variables:
+    TARGET_ENV: staging
+  script:
+    - echo "STOP ${TARGET_ENV}"
+  only:
+    - main
+  when: manual
+  environment:
+    name: staging
+    action: stop
+
+deploy to prod:
+  stage: deploy
+  variables:
+    TARGET_ENV: prod
+  script:
+    - echo "Do your deploy here to ${TARGET_ENV}"
+    - echo ${DB_SERVER}
+  only:
+    - main
+  when: manual
+  environment:
+    name: prod
+
+pages:
+  stage: deploy
+  script:
+    - mkdir -p public
+    - cp file1.txt public/index.html
+    - echo 404 >> public/404.html
+  artifacts:
+    exclude:
+      - public/404.html
+    paths:
+      - public
+  only:
+    - main
